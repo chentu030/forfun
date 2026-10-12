@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: fetch-classics-${{ github.ref }}
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -36,4 +39,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add books/
           git diff --cached --quiet || git commit -m "Add classics fetched from Wikisource"
-          git push
+          git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
