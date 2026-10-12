@@ -1,0 +1,69 @@
+# 觀相識人自學講義集：共用規格
+
+## 這套講義是什麼
+讀者想自學「觀相識人與手面相應用」這個主題（市面上有付費線上課程在教，但讀者不買課）。
+我們依照一份**公開課綱主題**自己寫一套講義：主題分類可以參考，**內容全部自己寫**，
+不得冒充或聲稱是任何付費課程（例如湯鎮偉／知識衛星的課）的內容，也不要去找、引用或改寫該課程的影片、逐字稿、講義。
+
+讀者要的是：**系統地懂傳統相法在講什麼、怎麼看**，同時**知道哪些說法有根據、哪些沒有**，
+最後能用在日常的觀察、溝通與自我修養上，而不是拿來給人貼標籤。
+
+## 共五冊（每冊一個資料夾內一份 HTML + 同名 PDF）
+| 冊 | 檔名 | 主題 |
+|---|---|---|
+| 一 | `01-五行形相.html` | 導讀（相術簡史、主要相書、科學檢驗與使用倫理）＋ 以形錄相：臉型／手型的五行分類（木火土金水）、《靈樞·陰陽二十五人》的五行人、五行生剋在溝通互動上的引申 |
+| 二 | `02-面相結構.html` | 三停（上中下停、早中晚年說）、五嶽四瀆、十二宮（命宮印堂、財帛、官祿、兄弟、夫妻、子女、疾厄、遷移、奴僕、田宅、福德、父母）、五官（采聽、保壽、監察、審辨、出納官）、氣色神采；《素問》《靈樞》的望診作對照 |
+| 三 | `03-手相結構.html` | 手型、三大主線（生命線、智慧線、感情線）與事業線等輔線、掌丘（中式八卦掌位／西式行星丘對照）、常見紋符（十字、島紋、星紋、斷掌）、指節與指甲；面相手相合參的邏輯 |
+| 四 | `04-實務應用.html` | 職場與合夥（相書怎麼說領導格局、誠信、「小人」特徵）、感情與擇偶、財運與健康（「漏財」相、氣色與身體警訊）。**每一條都要並列：相書原說 → 現代可驗證的觀察替代（行為、言談、紀錄、微表情研究的真實結論）→ 風險提醒** |
+| 五 | `05-修心養相.html` | 相隨心轉：心念、作息與氣色、儀態、利他與人脈；連結《冰鑑》（若有）、《傳習錄》《莊子》《素問·上古天真論》等原典；具體的 21 天練習計畫 |
+
+每冊約 20–35 頁 A4。
+
+## 素材
+- 古籍原文在 `books/*.txt`（中文維基文庫，公有領域；章節以 `==== 標題 ====` 分隔）。開工前先 `ls books/` 看有哪些。
+  相關的可能有：`靈樞.txt`（〈五色〉〈陰陽二十五人〉〈五閱五使〉〈本藏〉等）、`黃帝內經·素問.txt`（望診：〈脈要精微論〉〈五藏生成篇〉〈陰陽應象大論〉）、
+  以及若抓得到的相書：`神相全編` `麻衣神相/相法` `柳莊相法` `冰鑑/冰鑒` `太清神鑑` `玉管照神局` `月波洞中記` `人倫大統賦`。還有 `傳習錄` `莊子` `鬼谷子`（〈揣〉〈摩〉〈反應〉講觀察人）。
+- **引用原文只從這些檔案取，逐字照抄，標出書名篇名。** 找不到原文的相書口訣，就不要寫成引文；可以用自己的話說「傳統相書常見的說法是……」，並註明「未能核對原典」。
+- 白話、註解、解說、練習：全部自己寫。不可複製或改寫現代書籍、網路文章、課程講義的文字。
+
+## 圖片（重要：要多，但授權要乾淨）
+每冊至少 **10 張圖**，兩種來源混用：
+1. **自己畫的 SVG 示意圖**（最有用，每冊至少 4 張）：例如三停分區、十二宮位置圖、五官名稱、五行臉型輪廓、手掌主線與掌丘圖、八卦掌位、合參流程圖、練習打卡表。直接寫在 HTML 裡的 `<svg>`，用講義的配色（`#8a3b12` 主色、`#d9cbb0` 線、`#f6f1e7` 底），中文字用 `font-family="Noto Sans TC"`。
+2. **網路上的開放授權圖**：只用公有領域（PD / CC0）或 CC BY。
+   - Wellcome Collection（可直接連）：
+     `python3 -I /tmp/claude-0/-home-user-forfun/8060706b-5b9f-510b-a716-7c73d16ba77c/scratchpad/kit/wellcome.py search "關鍵字" 30`
+     `python3 -I .../kit/wellcome.py get <id> handouts/觀相識人/img 1200`
+     好用的關鍵字：`chinese physiognomy`、`physiognomy`、`Qing Chinese paediatric face diagnosis chart`、`palmistry`、`chiromancy`、`phrenology physiognomy palmistry`、`Japanese physiognomy`、`facial expression`、`Lavater`、`Le Brun passions`、`Chinese woodcut`。
+   - Internet Archive（archive.org 可連）也可以找古籍掃描（如《神相全編》刻本），用 `https://archive.org/advancedsearch.php?q=...&fl[]=identifier&fl[]=title&fl[]=date&fl[]=licenseurl&output=json`，IIIF/下載網址見 item 的 metadata API。只用 1929 年以前出版的掃描。
+   - 維基共享資源（Wikimedia）從這台機器被擋，不要浪費時間。
+   - **不要**用 Google 圖片、Pinterest、部落格、商業網站、課程網站的圖。
+   - 圖片統一放 `handouts/觀相識人/img/`，檔名加上冊號前綴避免撞名（例如 `02-wellcome-n9hs4w5a.jpg`），寬度不超過 1200px、jpg。下載前先 `ls img/` 看別冊是否已抓過同一張，可以共用。
+   - 每張網路圖下方用 `<figure><img src="img/…"><figcaption>圖說。來源：Wellcome Collection，Public Domain Mark／CC BY 4.0，連結</figcaption></figure>`。冊末加「圖片來源」一節列全部出處與授權。
+   - 圖說要說明**這張圖跟正文的關係**，看得出你真的看過那張圖（用 Read 工具打開圖檔確認內容）。英文標題的圖要用中文解說。
+
+## 立場與語氣（務必遵守）
+- 清楚、溫和、像好老師；不玄虛、不恐嚇（不要「此相必敗」「剋夫」這種斷語直接當真）。
+- 每一個判斷都分三層標清楚：**相書原說**（傳統說法）／**合理成分**（例如氣色反映睡眠與健康、表情與姿態反映情緒）／**沒有證據或有風險的部分**。
+- 相術預測性格、命運、誠信，**沒有科學證據支持**；「從臉判斷人品」的研究顯示準確度低、而且會強化偏見。講義要誠實寫出來，並給出替代：看行為、看紀錄、看他怎麼對待沒有利害關係的人。
+- 外貌與身體特徵（含疾病、障礙、族群特徵）**不可**被描述成品德缺陷。涉及「小人相」「剋夫相」「漏財相」等，一律以「相書如此主張，我們該怎麼看」的方式處理。
+- 健康相關（氣色、指甲、掌色）：只說「可能值得留意、看醫生」，不做診斷。
+
+## 版面
+- HTML 開頭固定：
+  ```html
+  <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+  <title>…</title><link rel="stylesheet" href="../handout.css"></head><body>
+  ```
+- 可用樣式見 `handouts/handout.css`（**不要改**；額外樣式寫在 HTML 的 `<style>` 裡，例如 figure 樣式）：
+  封面 `section.cover`（`.series` 寫「觀相識人自學講義」）、目錄 `section.toc`、原文 `div.yuanwen` + `span.src`、白話 `div.baihua`、字詞註 `dl.notes`、
+  提示框 `div.box`（`apply` 練習、`reflect` 反思、`warn` 常見誤解／風險）、`table`、換頁 `div.pagebreak`。
+- 建議 figure 樣式：`figure{margin:4mm 0;text-align:center;break-inside:avoid} figure img,figure svg{max-width:100%;max-height:150mm} figcaption{font-size:9pt;color:#666;margin-top:1.5mm;text-align:left}`
+- 每冊結構：封面 → 目錄 → 本冊導讀 → 主體各章（原文／圖解／解說／三層判讀）→ 練習 → 常見誤解 → 反思題 → 一頁總結 → 延伸閱讀（只列書名＋一句話）→ 圖片來源。
+
+## 轉 PDF 與檢查
+- `sh /tmp/claude-0/-home-user-forfun/8060706b-5b9f-510b-a716-7c73d16ba77c/scratchpad/kit/render.sh 輸入.html 輸出.pdf`（會列出破圖）
+- `pdfinfo` 看頁數；`pdftoppm -r 50 -png -f N -l N 檔.pdf 前綴`（輸出到 scratchpad）轉幾頁，用 Read 看：中文正常、圖有出來、SVG 沒跑版、原文框沒被切壞。有問題就修再轉。
+
+## 限制
+- 只建立／修改 `handouts/觀相識人/0N-*.html`、對應 `.pdf`、和 `handouts/觀相識人/img/` 裡你自己下載的圖。不要動其他檔案，不要 git commit 或 push。
+- 完成後回報：檔案清單、PDF 頁數、圖片數（SVG／網路圖各幾張）、引用了哪些原典篇章、哪些傳統說法找不到原典出處。
