@@ -1,10 +1,11 @@
 """從中文維基文庫下載古籍原文，每本存成一個 .txt。
 
-用法：pip install requests && python fetch_wikisource.py
-輸出在 ./books/ 資料夾。
+用法：pip install requests && python fetch_wikisource.py [書名 ...]
+不帶書名就抓全部。輸出在 ./books/ 資料夾。
 """
 import os
 import re
+import sys
 import time
 from html.parser import HTMLParser
 
@@ -110,9 +111,10 @@ def page_text(title):
     return p.text()
 
 
-def main():
+def main(names):
     os.makedirs("books", exist_ok=True)
-    for name, (prefix, keep) in BOOKS.items():
+    for name in names or BOOKS:
+        prefix, keep = BOOKS[name]
         index = prefix.rstrip("/")
         titles = [t for t in subpages(prefix) if keep is None or keep(t)]
         if not titles:  # 沒有子頁面時，改從目錄頁的連結找章節
@@ -134,4 +136,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])  # 不帶參數就抓全部；帶書名就只抓那幾本

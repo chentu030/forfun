@@ -12,11 +12,17 @@ permissions:
 
 concurrency:
   group: fetch-classics-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # 每本書一個 job，平行在不同 runner 上抓
   fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        book: [莊子, 黃帝內經·素問, 鬼谷子, 傳習錄, 抱朴子, 易經]
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +32,26 @@ jobs:
 
       - run: pip install requests
 
-      - run: python scripts/fetch_wikisource.py
+      - run: python scripts/fetch_wikisource.py "${{ matrix.book }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: book-${{ strategy.job-index }}
+          path: books/
+
+  # 收集所有書，一次 commit 回分支
+  commit:
+    needs: fetch
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: book-*
+          path: books/
+          merge-multiple: true
 
       - uses: actions/upload-artifact@v4
         with:
