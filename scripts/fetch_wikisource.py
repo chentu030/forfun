@@ -29,6 +29,18 @@ BOOKS = {
     "傳習錄": ("傳習錄/", None),
     "抱朴子": ("抱朴子/", None),
     "易經": ("周易/", None),  # 維基文庫以《周易》為主條目
+    # 相書（給觀相講義用）；維基文庫上找不到的會是空檔，合併後再清掉
+    "神相全編": ("神相全編/", None),
+    "麻衣神相": ("麻衣神相/", None),
+    "麻衣相法": ("麻衣相法/", None),
+    "柳莊相法": ("柳莊相法/", None),
+    "冰鑑": ("冰鑑/", None),
+    "冰鑒": ("冰鑒/", None),
+    "太清神鑑": ("太清神鑑/", None),
+    "玉管照神局": ("玉管照神局/", None),
+    "月波洞中記": ("月波洞中記/", None),
+    "人倫大統賦": ("人倫大統賦/", None),
+    "靈樞": ("黃帝內經/", lambda t: "靈樞" in t),
 }
 
 
@@ -136,6 +148,8 @@ def chapter_titles(name):
     prefix, keep = BOOKS[name]
     index = prefix.rstrip("/")
     titles = [t for t in subpages(prefix) if keep is None or keep(t)]
+    if not titles and not api(action="query", titles=index)["query"]["pages"][0].get("pageid"):
+        return []  # 維基文庫沒有這本
     if not titles:  # 沒有子頁面時，改從目錄頁的連結找章節
         titles = [t for t in linked_pages(index, index[:2])
                   if keep is None or keep(t)]
@@ -180,6 +194,9 @@ def merge():
     """把 parts/ 依序合併成 books/<書名>.txt。"""
     os.makedirs("books", exist_ok=True)
     for name in sorted(os.listdir("parts")):
+        if not any(os.path.getsize(os.path.join("parts", name, fn))
+                   for fn in os.listdir(os.path.join("parts", name))):
+            continue  # 整本都抓不到內容就不寫檔
         folder = os.path.join("parts", name)
         chapters = []
         for fn in sorted(os.listdir(folder)):
