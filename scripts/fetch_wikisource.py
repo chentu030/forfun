@@ -2,11 +2,18 @@
 
 用法：pip install requests && python fetch_wikisource.py [書名 ...]
 不帶書名就抓全部。輸出在 ./books/ 資料夾。
+
+GitHub Actions 平行抓取用：
+  python fetch_wikisource.py plan 20    # 列出章節並分成 20 片
+  python fetch_wikisource.py fetch 3    # 抓第 3 片
+  python fetch_wikisource.py merge      # 合併成每本一個檔
 """
+import json
 import os
 import re
 import sys
 import time
+from html import unescape
 from html.parser import HTMLParser
 
 import requests
@@ -111,29 +118,97 @@ def page_text(title):
     return p.text()
 
 
-def main(names):
-    os.makedirs("books", exist_ok=True)
-    for name in names or BOOKS:
-        prefix, keep = BOOKS[name]
-        index = prefix.rstrip("/")
-        titles = [t for t in subpages(prefix) if keep is None or keep(t)]
-        if not titles:  # 沒有子頁面時，改從目錄頁的連結找章節
-            titles = [t for t in linked_pages(index, index[:2])
-                      if keep is None or keep(t)]
-        if not titles:  # 還是沒有，全文可能就在主頁面
-            titles = [index]
+def index_order(index):
+    """目錄頁上的連結，依它們在頁面出現的先後排列（也就是書的章節順序）。"""
+    data = api(action="parse", page=index, prop="text", redirects=1)
+    if "error" in data:
+        return []
+    html = data["parse"]["text"]
+    seen = []
+    for m in re.finditer(r'<a [^>]*title="([^"]+)"', html):
+        t = unescape(m.group(1))
+        if t not in seen:
+            seen.append(t)
+    return seen
+
+
+def chapter_titles(name):
+    prefix, keep = BOOKS[name]
+    index = prefix.rstrip("/")
+    titles = [t for t in subpages(prefix) if keep is None or keep(t)]
+    if not titles:  # 沒有子頁面時，改從目錄頁的連結找章節
+        titles = [t for t in linked_pages(index, index[:2])
+                  if keep is None or keep(t)]
+    if not titles:  # 還是沒有，全文可能就在主頁面
+        return [index]
+    # API 給的是字碼順序；改照目錄頁的順序，目錄沒列到的放最後
+    order = {t: i for i, t in enumerate(index_order(index))}
+    return sorted(titles, key=lambda t: (order.get(t, len(order)), t))
+
+
+# ---- 分三步，讓 GitHub Actions 把章節分給多個 job 平行抓 ----
+
+def plan(shards):
+    """列出所有書的所有章節，輪流分配到 shards 個分片，寫進 plan.json。"""
+    tasks = []
+    for name in BOOKS:
+        titles = chapter_titles(name)
         print(f"{name}: {len(titles)} 頁")
-        out = [f"《{name}》 來源：中文維基文庫（公有領域）\n"]
-        for t in titles:
-            body = page_text(t)
-            if body:
-                out.append(f"\n\n==== {t} ====\n\n{body}")
-            time.sleep(0.5)  # 對維基伺服器客氣一點
-        path = os.path.join("books", f"{name}.txt")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("".join(out))
-        print(f"  -> {path}")
+        tasks += [{"book": name, "idx": i, "title": t} for i, t in enumerate(titles)]
+    for n, task in enumerate(tasks):
+        task["shard"] = n % shards
+    with open("plan.json", "w", encoding="utf-8") as f:
+        json.dump(tasks, f, ensure_ascii=False, indent=1)
+    print(f"共 {len(tasks)} 頁，分成 {shards} 片")
+
+
+def fetch(shard):
+    """抓 plan.json 裡屬於這個分片的章節，每章存成 parts/<書名>/<序號>.txt。"""
+    with open("plan.json", encoding="utf-8") as f:
+        tasks = [t for t in json.load(f) if t["shard"] == shard]
+    for t in tasks:
+        body = page_text(t["title"])
+        folder = os.path.join("parts", t["book"])
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, f"{t['idx']:04d}.txt"), "w", encoding="utf-8") as f:
+            f.write(f"==== {t['title']} ====\n\n{body}" if body else "")
+        time.sleep(0.5)  # 對維基伺服器客氣一點
+    print(f"分片 {shard}：抓了 {len(tasks)} 頁")
+
+
+def merge():
+    """把 parts/ 依序合併成 books/<書名>.txt。"""
+    os.makedirs("books", exist_ok=True)
+    for name in sorted(os.listdir("parts")):
+        folder = os.path.join("parts", name)
+        chapters = []
+        for fn in sorted(os.listdir(folder)):
+            with open(os.path.join(folder, fn), encoding="utf-8") as f:
+                if text := f.read():
+                    chapters.append(text)
+        with open(os.path.join("books", f"{name}.txt"), "w", encoding="utf-8") as f:
+            f.write(f"《{name}》 來源：中文維基文庫（公有領域）\n\n\n"
+                    + "\n\n\n".join(chapters))
+        print(f"{name}: {len(chapters)} 章 -> books/{name}.txt")
+
+
+def main(args):
+    if args and args[0] == "plan":
+        plan(int(args[1]))
+    elif args and args[0] == "fetch":
+        fetch(int(args[1]))
+    elif args and args[0] == "merge":
+        merge()
+    else:  # 本機一次跑完：可指定書名，不指定就抓全部
+        names = args or list(BOOKS)
+        plan(1)
+        with open("plan.json", encoding="utf-8") as f:
+            tasks = [t for t in json.load(f) if t["book"] in names]
+        with open("plan.json", "w", encoding="utf-8") as f:
+            json.dump(tasks, f, ensure_ascii=False)
+        fetch(0)
+        merge()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])  # 不帶參數就抓全部；帶書名就只抓那幾本
+    main(sys.argv[1:])
