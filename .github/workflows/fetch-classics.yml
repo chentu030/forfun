@@ -71,6 +71,7 @@ jobs:
           pattern: parts-*
           path: parts/
           merge-multiple: true
+      - run: pip install requests
       - run: python scripts/fetch_wikisource.py merge
       - uses: actions/upload-artifact@v4
         with:
