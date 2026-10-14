@@ -1,0 +1,206 @@
+# Albireus macOS desktop build — put this file in chentu030/forfun at
+#   .github/workflows/albireus-mac.yml   (on forfun's default branch)
+#
+# The app source stays private: it is checked out at run time from chentu030/stt_tool with
+# ALBIREUS_GH_TOKEN. Nothing from stt_tool is committed to forfun. Manual only (workflow_dispatch);
+# GitHub never passes secrets to workflows triggered from forks / PRs.
+#
+# forfun → Settings → Secrets and variables → Actions → New repository secret:
+#   MAC_CERT_P12           base64 of the "Developer ID Application" .p12 (same value as in stt_tool)
+#   MAC_CERT_PASSWORD      password of that .p12
+#   ASC_KEY_ID             App Store Connect API Key ID
+#   ASC_ISSUER_ID          App Store Connect Issuer ID
+#   ASC_KEY_P8             base64 of AuthKey_XXXX.p8
+#   ALBIREUS_GH_TOKEN      fine-grained PAT, repositories: stt_tool (Contents: Read) +
+#                          albireus-releases (Contents: Read and write)
+#
+# Run: forfun → Actions → "Albireus macOS release" → Run workflow
+#   publish = true  → uploads dmg / zip / blockmap / latest-mac.yml to albireus-releases v<desktop version>
+#   publish = false → build + notarize only; files are in the run's Artifacts (kept 3 days)
+name: Albireus macOS release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload to the GitHub release (false = build + notarize only, artifacts on this run)"
+        type: boolean
+        default: true
+      ref:
+        description: "stt_tool branch/commit to build"
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: albireus-mac
+  cancel-in-progress: false
+
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: chentu030/stt_tool
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.ALBIREUS_GH_TOKEN }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Check secrets
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ALBIREUS_GH_TOKEN: ${{ secrets.ALBIREUS_GH_TOKEN }}
+        run: |
+          missing=""
+          for v in MAC_CERT_P12 MAC_CERT_PASSWORD ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 ALBIREUS_GH_TOKEN; do [ -n "${!v}" ] || missing="$missing $v"; done
+          if [ -n "$missing" ]; then echo "::error::missing secrets:$missing"; exit 1; fi
+
+      - name: Baseline app shell → frontend/out-app (published, signature-checked)
+        run: node mobile/scripts/fetch-shell.mjs --out ../frontend/out-app
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
+
+      - name: Tests
+        working-directory: desktop
+        run: npm test
+
+      - name: Notarization key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+          echo "APPLE_API_KEY=$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize the app
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: npm run dist:mac -- --publish never
+
+      - name: Sign + notarize + staple the DMG
+        working-directory: desktop/release
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=(*.dmg)
+          [ ${#dmgs[@]} -gt 0 ] || { echo "::error::no .dmg in desktop/release"; exit 1; }
+          kc="$RUNNER_TEMP/dmg-sign.keychain-db"
+          kp="$(uuidgen)"
+          echo "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/dmg-cert.p12"
+          security create-keychain -p "$kp" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kp" "$kc"
+          security import "$RUNNER_TEMP/dmg-cert.p12" -k "$kc" -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/dmg-cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kp" "$kc" >/dev/null
+          identity="$(security find-identity -v -p codesigning "$kc" | awk '/Developer ID Application/ {print $2; exit}')"
+          [ -n "$identity" ] || { echo "::error::no Developer ID Application identity in MAC_CERT_P12"; exit 1; }
+          for d in "${dmgs[@]}"; do
+            codesign --force --timestamp --sign "$identity" --keychain "$kc" "$d"
+            echo "Submitting $d"
+            xcrun notarytool submit "$d" --key "$APPLE_API_KEY" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" \
+              --wait --timeout 60m --output-format json | tee "$RUNNER_TEMP/notary.json"
+            id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("id",""))' "$RUNNER_TEMP/notary.json")"
+            status="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("status",""))' "$RUNNER_TEMP/notary.json")"
+            if [ "$status" != "Accepted" ]; then
+              echo "::error::notarization of $d: $status"
+              xcrun notarytool log "$id" --key "$APPLE_API_KEY" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" || true
+              exit 1
+            fi
+            xcrun stapler staple -v "$d"
+          done
+          node ../scripts/refresh-update-info.mjs latest-mac.yml
+
+      - name: Verify signature + notarization (app, zip, dmg)
+        working-directory: desktop/release
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          app="$(ls -d mac-universal/*.app | head -1)"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+          xcrun stapler validate "$app"
+          for z in *.zip; do
+            rm -rf "$RUNNER_TEMP/zipcheck" && mkdir -p "$RUNNER_TEMP/zipcheck"
+            ditto -x -k "$z" "$RUNNER_TEMP/zipcheck"
+            zapp="$(ls -d "$RUNNER_TEMP"/zipcheck/*.app | head -1)"
+            codesign --verify --deep --strict "$zapp"
+            xcrun stapler validate "$zapp"
+          done
+          for d in *.dmg; do
+            codesign --verify --verbose=2 "$d"
+            spctl -a -t open --context context:primary-signature -v "$d"
+            xcrun stapler validate "$d"
+          done
+          test -f latest-mac.yml
+          bms=(*.zip.blockmap)
+          [ ${#bms[@]} -gt 0 ] && ls -l "${bms[@]}" || echo "::warning::no .zip.blockmap (updates will be full downloads)"
+          cat latest-mac.yml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: albireus-mac
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.blockmap
+            desktop/release/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish to chentu030/albireus-releases v<version>
+        if: ${{ inputs.publish }}
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.ALBIREUS_GH_TOKEN }}
+          REPO: chentu030/albireus-releases
+        run: |
+          set -euo pipefail
+          ver="$(node -p "require('./package.json').version")"
+          tag="v$ver"
+          files=(
+            "release/Albireus-$ver-mac-universal.dmg"
+            "release/Albireus-$ver-mac-universal.zip"
+            "release/latest-mac.yml"
+          )
+          for f in "${files[@]}"; do [ -f "$f" ] || { echo "::error::missing $f"; exit 1; }; done
+          bm="release/Albireus-$ver-mac-universal.zip.blockmap"
+          [ -f "$bm" ] && files+=("$bm")
+          if ! gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
+            gh release create "$tag" -R "$REPO" --title "Albireus $ver" --notes "Albireus $ver"
+          fi
+          # Only the mac files are uploaded; Windows assets in the same release are left alone.
+          gh release upload "$tag" -R "$REPO" --clobber "${files[@]}"
+          gh release view "$tag" -R "$REPO" --json assets --jq '.assets[].name'
+
+      - name: Remove key
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/dmg-cert.p12"
+          security delete-keychain "$RUNNER_TEMP/dmg-sign.keychain-db" 2>/dev/null || true
