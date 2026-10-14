@@ -118,7 +118,8 @@ jobs:
           security unlock-keychain -p "$kp" "$kc"
           security import "$RUNNER_TEMP/dmg-cert.p12" -k "$kc" -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign
           rm -f "$RUNNER_TEMP/dmg-cert.p12"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$kp" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kp" "$kc" >/dev/null || echo "::warning::set-key-partition-list failed; relying on -T codesign"
           identity="$(security find-identity -v -p codesigning "$kc" | awk '/Developer ID Application/ {print $2; exit}')"
           [ -n "$identity" ] || { echo "::error::no Developer ID Application identity in MAC_CERT_P12"; exit 1; }
           for d in "${dmgs[@]}"; do
