@@ -16,24 +16,36 @@ jobs:
     timeout-minutes: 340
     strategy:
       fail-fast: false
-      max-parallel: 14
+      max-parallel: 20
       matrix:
         include:
-          - { name: market_total, year: 2019, start: "20191201", end: "20191231" }
-          - { name: market_total, year: 2020, start: "20200101", end: "20201231" }
-          - { name: market_total, year: 2021, start: "20210101", end: "20211231" }
-          - { name: market_total, year: 2022, start: "20220101", end: "20221231" }
-          - { name: market_total, year: 2023, start: "20230101", end: "20231231" }
-          - { name: market_total, year: 2024, start: "20240101", end: "20241231" }
-          - { name: market_total, year: 2025, start: "20250101", end: "20251231" }
-          - { name: market_total, year: 2026, start: "20260101", end: "20261022" }
-          - { name: foreign, year: 2020, start: "20200101", end: "20201231" }
-          - { name: foreign, year: 2021, start: "20210101", end: "20211231" }
-          - { name: foreign, year: 2022, start: "20220101", end: "20221231" }
-          - { name: foreign, year: 2023, start: "20230101", end: "20231231" }
-          - { name: foreign, year: 2024, start: "20240101", end: "20241231" }
-          - { name: foreign, year: 2025, start: "20250101", end: "20251231" }
-          - { name: foreign, year: 2026, start: "20260101", end: "20261022" }
+          - { name: market_total, year: "2019h2", start: "20191201", end: "20191231" }
+          - { name: market_total, year: "2020h1", start: "20200101", end: "20200630" }
+          - { name: market_total, year: "2020h2", start: "20200701", end: "20201231" }
+          - { name: market_total, year: "2021h1", start: "20210101", end: "20210630" }
+          - { name: market_total, year: "2021h2", start: "20210701", end: "20211231" }
+          - { name: market_total, year: "2022h1", start: "20220101", end: "20220630" }
+          - { name: market_total, year: "2022h2", start: "20220701", end: "20221231" }
+          - { name: market_total, year: "2023h1", start: "20230101", end: "20230630" }
+          - { name: market_total, year: "2023h2", start: "20230701", end: "20231231" }
+          - { name: market_total, year: "2024h1", start: "20240101", end: "20240630" }
+          - { name: market_total, year: "2024h2", start: "20240701", end: "20241231" }
+          - { name: market_total, year: "2025h1", start: "20250101", end: "20250630" }
+          - { name: market_total, year: "2025h2", start: "20250701", end: "20251231" }
+          - { name: market_total, year: "2026h1", start: "20260101", end: "20260630" }
+          - { name: market_total, year: "2026h2", start: "20260701", end: "20261022" }
+          - { name: foreign, year: "2020h1", start: "20200101", end: "20200630" }
+          - { name: foreign, year: "2020h2", start: "20200701", end: "20201231" }
+          - { name: foreign, year: "2021h1", start: "20210101", end: "20210630" }
+          - { name: foreign, year: "2021h2", start: "20210701", end: "20211231" }
+          - { name: foreign, year: "2022h1", start: "20220101", end: "20220630" }
+          - { name: foreign, year: "2022h2", start: "20220701", end: "20221231" }
+          - { name: foreign, year: "2023h1", start: "20230101", end: "20230630" }
+          - { name: foreign, year: "2023h2", start: "20230701", end: "20231231" }
+          - { name: foreign, year: "2024h1", start: "20240101", end: "20240630" }
+          - { name: foreign, year: "2024h2", start: "20240701", end: "20241231" }
+          - { name: foreign, year: "2025h1", start: "20250101", end: "20250630" }
+          - { name: foreign, year: "2025h2", start: "20250701", end: "20251231" }
     env:
       STOCKDB_ROOT: ${{ github.workspace }}/out
       PYTHONUTF8: "1"
