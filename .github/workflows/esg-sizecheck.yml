@@ -6,6 +6,9 @@ on:
       shards:
         description: "總 shard 數"
         default: "20"
+      years:
+        description: "年度範圍，例如 2023-2025"
+        default: ""
 
 jobs:
   repair:
@@ -26,7 +29,7 @@ jobs:
       - working-directory: esg_download
         run: pip install pymupdf==1.26.7 requests google-cloud-storage
       - working-directory: esg_download
-        run: python sizecheck.py ${{ matrix.shard }} ${{ inputs.shards }}
+        run: python sizecheck.py ${{ matrix.shard }} ${{ inputs.shards }} "${{ inputs.years }}"
         env:
           GCS_BUCKET: ${{ secrets.ESG_GCS_BUCKET }}
           PYTHONUNBUFFERED: "1"

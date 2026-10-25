@@ -5,7 +5,7 @@
   大小不同就再下載第三次，以兩次相同、且結構完整（有 %%EOF、PyMuPDF 讀得到頁數）的版本為準，必要時替換並重新抽字。
 - 補救時從 ZIP／Word／PPTX 轉成的 PDF（來源不是 PDF），標記後略過。
 
-用法：python sizecheck.py <shard> <總 shard 數>
+用法：python sizecheck.py <shard> <總 shard 數> [年度範圍，例如 2023-2025]
 結果寫到 GCS sizecheck/shard_XX.json
 """
 import gzip
@@ -26,7 +26,9 @@ import extract
 SHARD, TOTAL = int(sys.argv[1]), int(sys.argv[2])
 UA = {"User-Agent": "Mozilla/5.0"}
 bucket = storage.Client().bucket(os.environ["GCS_BUCKET"])
-items = json.loads(Path("manifest.json").read_text(encoding="utf-8"))[SHARD::TOTAL]
+Y0, Y1 = (map(int, sys.argv[3].split("-")) if len(sys.argv) > 3 and sys.argv[3] else (0, 9999))
+items = [x for x in json.loads(Path("manifest.json").read_text(encoding="utf-8")) if Y0 <= x["year"] <= Y1][SHARD::TOTAL]
+TAG = f"{Y0}-{Y1}" if Y1 < 9999 else "all"
 results = []
 
 
@@ -138,5 +140,5 @@ def check(x):
 with ThreadPoolExecutor(3) as ex:
     list(ex.map(check, items))
 from collections import Counter  # noqa: E402
-bucket.blob(f"sizecheck/shard_{SHARD:02d}.json").upload_from_string(json.dumps(results, ensure_ascii=False, indent=1))
+bucket.blob(f"sizecheck/{TAG}/shard_{SHARD:02d}.json").upload_from_string(json.dumps(results, ensure_ascii=False, indent=1))
 print(f"shard {SHARD}：", dict(Counter(r["status"] for r in results)), flush=True)
