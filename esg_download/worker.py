@@ -7,6 +7,7 @@
 import gzip
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -57,10 +58,18 @@ def process(x):
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             f.write(data)
             path = f.name
+        out_json = path + ".json"
         try:
-            pages = extract.extract(path)
+            # 抽字放到子程序：PyMuPDF 不是 thread-safe，壞檔當掉也只影響這一份
+            r = subprocess.run([sys.executable, "extract_one.py", path, out_json], capture_output=True, timeout=600)
+            if r.returncode != 0 or not os.path.exists(out_json):
+                raise RuntimeError(f"抽字失敗（exit {r.returncode}）：{r.stderr.decode('utf-8', 'ignore')[-200:]}")
+            with open(out_json, encoding="utf-8") as f:
+                pages = json.load(f)
         finally:
-            os.remove(path)
+            for fp in (path, out_json):
+                if os.path.exists(fp):
+                    os.remove(fp)
         snips = [s for i, t in enumerate(pages, 1) for s in extract.page_snippets(i, t)]
         chosen, used = [], 0
         for s in sorted(snips, key=lambda s: -s["score"]):
