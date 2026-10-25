@@ -21,7 +21,7 @@ from google.cloud import storage
 import extract
 
 SHARD, TOTAL = int(sys.argv[1]), int(sys.argv[2])
-CONNS = int(os.environ.get("CONNS", "3"))
+CONNS = int(os.environ.get("CONNS", "3"))  # 公開資訊觀測站不回報檔案大小、容易中途斷線，總連線數建議 ≤ 20
 UA = {"User-Agent": "Mozilla/5.0"}
 
 bucket = storage.Client().bucket(os.environ["GCS_BUCKET"])
@@ -36,17 +36,31 @@ failures = []
 t0 = time.time()
 
 
+def complete_pdf(b, content_length=None):
+    """完整的 PDF：開頭 %PDF、結尾 4KB 內有 %%EOF，且（伺服器有回報時）大小與 Content-Length 相同。
+    公開資訊觀測站用 HTTP/1.0 且不回報大小，傳到一半斷線時看起來和正常結束一樣，所以一定要檢查 %%EOF。"""
+    if not (b[:4] == b"%PDF" and b"%%EOF" in b[-4096:]):
+        return False
+    return not content_length or int(content_length) == len(b)
+
+
 def fetch(url):
     last = None
-    for attempt in range(5):
+    for attempt in range(6):
         try:
             r = requests.get(url, headers=UA, timeout=900)
-            if r.status_code == 200 and r.content.startswith(b"%PDF"):
-                return r.content
-            last = f"HTTP {r.status_code}，前 60 bytes：{r.content[:60]!r}"
+            b = r.content
+            if r.status_code == 200 and complete_pdf(b, r.headers.get("Content-Length")):
+                return b
+            # ZIP、舊版 Word 等非 PDF 檔，交給 rescue.py 轉檔，這裡不重試
+            if r.status_code == 200 and len(b) > 1000 and (b[:2] == b"PK" or b[:4] == bytes.fromhex("d0cf11e0")):
+                raise RuntimeError(f"非 PDF 檔（{b[:4]!r}），需轉檔")
+            last = f"HTTP {r.status_code}，{len(b)} bytes，Content-Length {r.headers.get('Content-Length')}，有 EOF：{b'%%EOF' in b[-4096:]}"
+        except RuntimeError:
+            raise
         except Exception as e:
             last = str(e)[:200]
-        time.sleep(20 * (attempt + 1))  # 被擋或逾時就退避
+        time.sleep(20 * (attempt + 1))  # 被擋、逾時或檔案不完整就退避
     raise RuntimeError(last)
 
 
