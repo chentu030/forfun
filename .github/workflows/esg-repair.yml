@@ -1,0 +1,32 @@
+name: esg-repair-truncated
+
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "總 shard 數"
+        default: "10"
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.ESG_GCP_SA_KEY }}
+      - working-directory: esg_download
+        run: pip install pymupdf==1.26.7 requests google-cloud-storage
+      - working-directory: esg_download
+        run: python repair.py ${{ matrix.shard }} ${{ inputs.shards }}
+        env:
+          GCS_BUCKET: ${{ secrets.ESG_GCS_BUCKET }}
+          PYTHONUNBUFFERED: "1"
