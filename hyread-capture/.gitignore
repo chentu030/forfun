@@ -1,0 +1,8 @@
+output/
+*.pdf
+books.json
+_repo/
+__pycache__/
+.profile_*/
+hyread_profile/
+*.pyc

@@ -1,0 +1,79 @@
+name: HyRead Capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      chunks:
+        description: "並行 runner 數量 (1-20)"
+        required: false
+        default: "10"
+      limit:
+        description: "每個 runner 最多抓幾本 (0=不限)"
+        required: false
+        default: "0"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: matrix
+        run: |
+          CHUNKS=${{ inputs.chunks || '10' }}
+          echo "matrix=$(python3 -c "import json; print(json.dumps({'chunk': list(range(int('$CHUNKS')))}))")" >> "$GITHUB_OUTPUT"
+
+  capture:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install patchright openpyxl
+          patchright install chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb > /dev/null 2>&1
+
+      - name: Capture books
+        env:
+          HYREAD_USER: ${{ secrets.HYREAD_USER }}
+          HYREAD_PASS: ${{ secrets.HYREAD_PASS }}
+          HYREAD_LIBRARY: ${{ secrets.HYREAD_LIBRARY }}
+          DISPLAY: ":99"
+        working-directory: hyread-capture
+        run: |
+          Xvfb :99 -screen 0 1280x900x24 &
+          sleep 2
+          python capture.py \
+            --books books.json \
+            --output output \
+            --chunk ${{ matrix.chunk }} \
+            --total-chunks ${{ inputs.chunks || '10' }}
+
+      - name: Upload PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfs-${{ matrix.chunk }}
+          path: hyread-capture/output/*.pdf
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-${{ matrix.chunk }}
+          path: hyread-capture/output/_summary_*.json
+          if-no-files-found: ignore
